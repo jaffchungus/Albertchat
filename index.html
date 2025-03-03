@@ -27,7 +27,6 @@
             z-index: 10;
         }
 
-        /* Search Section */
         .search-section {
             padding: 30px;
             background: rgba(255, 255, 255, 0.05);
@@ -58,7 +57,7 @@
         .search-input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
         }
 
         .search-btn {
@@ -74,19 +73,16 @@
 
         .search-btn:hover {
             transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(0, 255, 204, 0.3);
+            box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
         }
 
-        /* 3D Canvas */
         #three-canvas {
             width: 100%;
             height: 700px;
             border-radius: 20px;
             background: rgba(0, 0, 0, 0.2);
-            overflow: hidden;
         }
 
-        /* Controls */
         .controls {
             position: absolute;
             bottom: 20px;
@@ -96,13 +92,13 @@
         }
 
         .control-btn {
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             border: none;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.15);
             color: white;
-            font-size: 20px;
+            font-size: 18px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
@@ -112,15 +108,14 @@
             transform: scale(1.1);
         }
 
-        /* Loading */
         .loading {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 80px;
-            height: 80px;
-            border: 8px solid rgba(255, 255, 255, 0.2);
-            border-top: 8px solid #00ffcc;
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255, 255, 255, 0.2);
+            border-top: 6px solid #00ffcc;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             transform: translate(-50%, -50%);
@@ -132,23 +127,19 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* Additional Styling */
         .search-section::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             background: linear-gradient(45deg, rgba(0, 255, 204, 0.1), rgba(255, 0, 102, 0.1));
             border-radius: 20px;
             z-index: -1;
-            animation: glow 3s infinite;
+            animation: pulse 3s infinite;
         }
 
-        @keyframes glow {
+        @keyframes pulse {
             0% { opacity: 0.5; }
-            50% { opacity: 1; }
+            50% { opacity: 0.8; }
             100% { opacity: 0.5; }
         }
     </style>
@@ -165,6 +156,7 @@
         <div class="controls">
             <button class="control-btn" data-action="zoom-in">+</button>
             <button class="control-btn" data-action="zoom-out">-</button>
+            <button class="control-btn" data-action="reset">↺</button>
         </div>
         <div class="loading"></div>
     </div>
@@ -178,83 +170,90 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / 700, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         const canvas = document.getElementById('three-canvas');
-        
+
         renderer.setSize(canvas.offsetWidth, 700);
         canvas.appendChild(renderer.domElement);
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
         // Camera Position
-        camera.position.z = 5;
+        camera.position.set(0, 2, 5);
 
         // Orbit Controls
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.screenSpacePanning = false;
-        controls.minDistance = 2;
+        controls.minDistance = 1;
         controls.maxDistance = 20;
 
         // GLTF Loader
         const loader = new THREE.GLTFLoader();
-        let currentModel;
+        let currentModel = null;
 
         // UI Elements
         const searchInput = document.querySelector('.search-input');
         const searchBtn = document.querySelector('.search-btn');
         const loading = document.querySelector('.loading');
-        const zoomControls = document.querySelectorAll('.control-btn');
+        const controlBtns = document.querySelectorAll('.control-btn');
 
-        // Sample 3D Models (public URLs without API keys)
+        // Sample 3D Models (public URLs)
         const modelDatabase = {
             'car': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf',
             'chair': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/SheenChair/glTF/SheenChair.gltf',
-            'tree': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf', // Using Avocado as a stand-in
+            'tree': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf',
             'default': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Cube/glTF/Cube.gltf'
         };
 
         // Load Model Function
-        async function loadModel(query) {
+        function loadModel(query) {
             loading.style.display = 'block';
+            console.log('Searching for:', query);
+
             if (currentModel) {
                 scene.remove(currentModel);
+                currentModel = null;
             }
 
             const modelKey = Object.keys(modelDatabase).find(key => query.toLowerCase().includes(key)) || 'default';
             const url = modelDatabase[modelKey];
+            console.log('Loading model from:', url);
 
-            try {
-                const gltf = await new Promise((resolve, reject) => {
-                    loader.load(url, resolve, undefined, reject);
-                });
-                
-                currentModel = gltf.scene;
-                scene.add(currentModel);
+            loader.load(
+                url,
+                (gltf) => {
+                    currentModel = gltf.scene;
+                    scene.add(currentModel);
 
-                // Center and scale model
-                const box = new THREE.Box3().setFromObject(currentModel);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const scale = 4 / maxDim;
-                
-                currentModel.scale.set(scale, scale, scale);
-                currentModel.position.sub(center.multiplyScalar(scale));
-                
-                controls.reset();
-                camera.position.set(0, 2, 5);
-                controls.update();
-            } catch (error) {
-                console.error('Error loading model:', error);
-                loadModel('default'); // Fallback to cube
-            }
-            
-            loading.style.display = 'none';
+                    // Center and scale model
+                    const box = new THREE.Box3().setFromObject(currentModel);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 3 / maxDim;
+
+                    currentModel.scale.set(scale, scale, scale);
+                    currentModel.position.sub(center.multiplyScalar(scale));
+
+                    controls.reset();
+                    camera.position.set(0, 1, 5);
+                    controls.update();
+                    loading.style.display = 'none';
+                    console.log('Model loaded successfully');
+                },
+                (progress) => {
+                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+                },
+                (error) => {
+                    console.error('Error loading model:', error);
+                    loadModel('default'); // Fallback to cube
+                    loading.style.display = 'none';
+                }
+            );
         }
 
         // Animation Loop
@@ -265,27 +264,35 @@
         }
         animate();
 
-        // Event Listeners
-        searchBtn.addEventListener('click', () => {
+        // Search Handler
+        function handleSearch() {
             const query = searchInput.value.trim();
-            if (query) loadModel(query);
-        });
+            if (query) {
+                loadModel(query);
+            }
+        }
+
+        // Event Listeners
+        searchBtn.addEventListener('click', handleSearch);
 
         searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && searchInput.value.trim()) {
-                loadModel(searchInput.value.trim());
+            if (e.key === 'Enter') {
+                handleSearch();
             }
         });
 
-        zoomControls.forEach(btn => {
+        controlBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const action = btn.dataset.action;
                 if (action === 'zoom-in') {
                     camera.position.z -= 0.5;
-                } else {
+                } else if (action === 'zoom-out') {
                     camera.position.z += 0.5;
+                } else if (action === 'reset') {
+                    camera.position.set(0, 1, 5);
+                    controls.reset();
                 }
-                camera.position.z = THREE.MathUtils.clamp(camera.position.z, 2, 20);
+                camera.position.z = Math.max(1, Math.min(20, camera.position.z));
                 controls.update();
             });
         });
