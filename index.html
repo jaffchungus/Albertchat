@@ -115,51 +115,44 @@
             };
 
             try {
-                console.log('Sending request to Gemini API with:', text);
+                console.log('Fetching from Gemini:', text);
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error('API request failed');
                 const data = await response.json();
                 const result = data.candidates[0].content.parts[0].text;
                 console.log('Gemini response:', result);
                 return result;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "Sorry, Albert couldn’t process that. Please try again.";
+                return "I didn’t catch that. Could you say it again?";
             }
         }
 
-        // Text-to-Speech with Debugging
+        // Text-to-Speech with Natural Voice
         function speakResponse(text) {
-            console.log('Attempting to speak:', text);
+            console.log('Speaking:', text);
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
 
-            if (voices.length === 0) {
-                console.error('No voices available yet');
-                status.textContent = "Waiting for voices to load...";
-                setTimeout(() => speakResponse(text), 500); // Retry after delay
-                return;
-            }
-
-            const maleVoice = voices.find(voice => 
+            // Select a natural-sounding male voice
+            const naturalVoice = voices.find(voice => 
+                voice.name.toLowerCase().includes('google') || // Prefer Google voices for realism
                 voice.name.toLowerCase().includes('daniel') || 
                 voice.name.toLowerCase().includes('david') || 
                 voice.name.toLowerCase().includes('matthew') || 
                 voice.lang === 'en-US'
-            ) || voices[0];
+            ) || voices[0]; // Fallback to first available voice
 
-            console.log('Selected voice:', maleVoice ? maleVoice.name : 'Default');
+            console.log('Voice selected:', naturalVoice ? naturalVoice.name : 'Default');
 
-            utterance.voice = maleVoice;
-            utterance.rate = 0.9;
-            utterance.pitch = 1.0;
+            utterance.voice = naturalVoice;
+            utterance.rate = 0.95; // Slightly slower for natural cadence
+            utterance.pitch = 1.0; // Normal pitch
             utterance.volume = 1.0;
 
             isAiSpeaking = true;
@@ -183,11 +176,16 @@
                 console.error('Speech synthesis error:', event.error);
                 isAiSpeaking = false;
                 loading.style.display = 'none';
-                status.textContent = "Error speaking. Retrying...";
-                recognition.start();
+                status.textContent = "Listening for you...";
+                recognition.start(); // Silently retry
             };
 
-            speechSynthesis.speak(utterance);
+            if (voices.length > 0) {
+                speechSynthesis.speak(utterance);
+            } else {
+                console.log('Voices not loaded yet, waiting...');
+                setTimeout(() => speakResponse(text), 500); // Retry if voices aren’t ready
+            }
         }
 
         // Speech Recognition Handler
@@ -206,9 +204,9 @@
         };
 
         recognition.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
+            console.error('Recognition error:', event.error);
             if (!isAiSpeaking) {
-                status.textContent = "Error: Couldn’t hear you. Retrying...";
+                status.textContent = "Listening for you...";
                 setTimeout(() => recognition.start(), 500);
             }
         };
@@ -223,7 +221,7 @@
         // Initialization
         function initialize() {
             const voices = speechSynthesis.getVoices();
-            console.log('Voices available:', voices.map(v => v.name));
+            console.log('Available voices:', voices.map(v => v.name));
             if (voices.length > 0) {
                 status.textContent = "Listening for you...";
                 recognition.start();
