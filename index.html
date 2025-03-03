@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real 3D Model Explorer</title>
+    <title>Gemini Voice Chat</title>
     <style>
         * {
             margin: 0;
@@ -13,99 +13,60 @@
 
         body {
             font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #1e1e2f 0%, #2a2a4a 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
-            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             color: white;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            position: relative;
-            z-index: 10;
-        }
-
-        .search-section {
-            padding: 30px;
+            text-align: center;
+            padding: 40px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 20px;
-            backdrop-filter: blur(10px);
             box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
-            margin-bottom: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
         }
 
-        .search-box {
-            display: flex;
-            gap: 15px;
-            align-items: center;
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
         }
 
-        .search-input {
-            flex: 1;
-            padding: 15px 25px;
-            border: none;
-            border-radius: 30px;
+        .status {
+            font-size: 20px;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 10px;
             background: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 18px;
-            transition: all 0.3s ease;
         }
 
-        .search-input:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-        }
-
-        .search-btn {
+        .start-btn {
             padding: 15px 40px;
             border: none;
             border-radius: 30px;
             background: linear-gradient(45deg, #00ffcc, #ff0066);
             color: white;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
         }
 
-        .search-btn:hover {
+        .start-btn:hover {
             transform: scale(1.05);
             box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
         }
 
-        #three-canvas {
-            width: 100%;
-            height: 700px;
-            border-radius: 20px;
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-        }
-
-        .control-btn {
-            width: 40px;
-            height: 40px;
-            border: none;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+        .start-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .loading {
@@ -127,7 +88,8 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        .search-section::before {
+        /* Additional styling for effect */
+        .container::before {
             content: '';
             position: absolute;
             inset: 0;
@@ -146,166 +108,128 @@
 </head>
 <body>
     <div class="container">
-        <div class="search-section">
-            <div class="search-box">
-                <input type="text" class="search-input" placeholder="Search for a 3D model (e.g., car, chair, tree)">
-                <button class="search-btn">Search</button>
-            </div>
-        </div>
-        <div id="three-canvas"></div>
-        <div class="controls">
-            <button class="control-btn" data-action="zoom-in">+</button>
-            <button class="control-btn" data-action="zoom-out">-</button>
-            <button class="control-btn" data-action="reset">↺</button>
-        </div>
-        <div class="loading"></div>
+        <h1>Gemini Voice Chat</h1>
+        <div class="status">Press Start to begin</div>
+        <button class="start-btn" id="startBtn">Start Talking</button>
+        <div class="loading" id="loading"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-        // Three.js Setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / 700, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        const canvas = document.getElementById('three-canvas');
+        const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE";
+        const status = document.querySelector('.status');
+        const startBtn = document.getElementById('startBtn');
+        const loading = document.getElementById('loading');
 
-        renderer.setSize(canvas.offsetWidth, 700);
-        canvas.appendChild(renderer.domElement);
+        let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        let isAiSpeaking = false;
+        let isListening = false;
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 5, 5);
-        scene.add(directionalLight);
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
 
-        // Camera Position
-        camera.position.set(0, 2, 5);
+        // Gemini API Call
+        async function getGeminiResponse(text) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
+            const body = {
+                contents: [{
+                    parts: [{
+                        text: text
+                    }]
+                }]
+            };
 
-        // Orbit Controls
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.minDistance = 1;
-        controls.maxDistance = 20;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
 
-        // GLTF Loader
-        const loader = new THREE.GLTFLoader();
-        let currentModel = null;
+                if (!response.ok) throw new Error('API request failed');
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error('Gemini API Error:', error);
+                return "Sorry, I couldn't process that. Please try again.";
+            }
+        }
 
-        // UI Elements
-        const searchInput = document.querySelector('.search-input');
-        const searchBtn = document.querySelector('.search-btn');
-        const loading = document.querySelector('.loading');
-        const controlBtns = document.querySelectorAll('.control-btn');
+        // Text-to-Speech with Male Voice
+        function speakResponse(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = speechSynthesis.getVoices();
+            const maleVoice = voices.find(voice => 
+                voice.name.includes('Male') || 
+                voice.name.includes('Daniel') || 
+                voice.name.includes('David') || 
+                voice.gender === 'male'
+            ) || voices[0]; // Fallback to first voice if no male found
 
-        // Sample 3D Models (public URLs)
-        const modelDatabase = {
-            'car': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf',
-            'chair': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/SheenChair/glTF/SheenChair.gltf',
-            'tree': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf',
-            'default': 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Cube/glTF/Cube.gltf'
+            utterance.voice = maleVoice;
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            isAiSpeaking = true;
+            startBtn.disabled = true;
+            status.textContent = "AI is speaking...";
+
+            utterance.onend = () => {
+                isAiSpeaking = false;
+                startBtn.disabled = false;
+                status.textContent = "Press Start to talk again";
+                if (!isListening) recognition.start(); // Restart listening after AI finishes
+            };
+
+            speechSynthesis.speak(utterance);
+        }
+
+        // Speech Recognition Handler
+        recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript;
+            status.textContent = `You said: ${transcript}`;
+            loading.style.display = 'block';
+
+            const response = await getGeminiResponse(transcript);
+            loading.style.display = 'none';
+
+            speakResponse(response);
         };
 
-        // Load Model Function
-        function loadModel(query) {
-            loading.style.display = 'block';
-            console.log('Searching for:', query);
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            status.textContent = "Error: Couldn’t hear you. Try again.";
+            isListening = false;
+            startBtn.disabled = false;
+            loading.style.display = 'none';
+        };
 
-            if (currentModel) {
-                scene.remove(currentModel);
-                currentModel = null;
+        recognition.onend = () => {
+            isListening = false;
+            if (!isAiSpeaking) {
+                startBtn.disabled = false;
+                status.textContent = "Press Start to talk again";
             }
+        };
 
-            const modelKey = Object.keys(modelDatabase).find(key => query.toLowerCase().includes(key)) || 'default';
-            const url = modelDatabase[modelKey];
-            console.log('Loading model from:', url);
-
-            loader.load(
-                url,
-                (gltf) => {
-                    currentModel = gltf.scene;
-                    scene.add(currentModel);
-
-                    // Center and scale model
-                    const box = new THREE.Box3().setFromObject(currentModel);
-                    const center = box.getCenter(new THREE.Vector3());
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = 3 / maxDim;
-
-                    currentModel.scale.set(scale, scale, scale);
-                    currentModel.position.sub(center.multiplyScalar(scale));
-
-                    controls.reset();
-                    camera.position.set(0, 1, 5);
-                    controls.update();
-                    loading.style.display = 'none';
-                    console.log('Model loaded successfully');
-                },
-                (progress) => {
-                    console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-                },
-                (error) => {
-                    console.error('Error loading model:', error);
-                    loadModel('default'); // Fallback to cube
-                    loading.style.display = 'none';
-                }
-            );
-        }
-
-        // Animation Loop
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // Search Handler
-        function handleSearch() {
-            const query = searchInput.value.trim();
-            if (query) {
-                loadModel(query);
-            }
-        }
-
-        // Event Listeners
-        searchBtn.addEventListener('click', handleSearch);
-
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleSearch();
+        // Start Button Handler
+        startBtn.addEventListener('click', () => {
+            if (!isAiSpeaking && !isListening) {
+                isListening = true;
+                startBtn.disabled = true;
+                status.textContent = "Listening...";
+                recognition.start();
             }
         });
 
-        controlBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const action = btn.dataset.action;
-                if (action === 'zoom-in') {
-                    camera.position.z -= 0.5;
-                } else if (action === 'zoom-out') {
-                    camera.position.z += 0.5;
-                } else if (action === 'reset') {
-                    camera.position.set(0, 1, 5);
-                    controls.reset();
-                }
-                camera.position.z = Math.max(1, Math.min(20, camera.position.z));
-                controls.update();
-            });
-        });
+        // Ensure voices are loaded
+        window.speechSynthesis.onvoiceschanged = () => {
+            // Voices are now available
+        };
 
-        // Initial Load
-        loadModel('default');
-
-        // Resize Handler
-        window.addEventListener('resize', () => {
-            camera.aspect = canvas.offsetWidth / 700;
-            camera.updateProjectionMatrix();
-            renderer.setSize(canvas.offsetWidth, 700);
-        });
+        // Initial setup
+        status.textContent = "Press Start to begin";
     </script>
 </body>
 </html>
