@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Voice Chat</title>
+    <title>Albert Chat</title>
     <style>
         * {
             margin: 0;
@@ -29,10 +29,12 @@
             box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
             position: relative;
+            width: 90%;
+            max-width: 600px;
         }
 
         h1 {
-            font-size: 36px;
+            font-size: 42px;
             margin-bottom: 20px;
             text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
         }
@@ -40,33 +42,10 @@
         .status {
             font-size: 20px;
             margin: 20px 0;
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.1);
-        }
-
-        .start-btn {
-            padding: 15px 40px;
-            border: none;
-            border-radius: 30px;
-            background: linear-gradient(45deg, #00ffcc, #ff0066);
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .start-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
-        }
-
-        .start-btn:disabled {
-            background: #666;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+            min-height: 60px;
         }
 
         .loading {
@@ -88,7 +67,6 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
-        /* Additional styling for effect */
         .container::before {
             content: '';
             position: absolute;
@@ -108,23 +86,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>Gemini Voice Chat</h1>
-        <div class="status">Press Start to begin</div>
-        <button class="start-btn" id="startBtn">Start Talking</button>
+        <h1>Albert Chat</h1>
+        <div class="status">Say something to start chatting with Albert...</div>
         <div class="loading" id="loading"></div>
     </div>
 
     <script>
         const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE";
         const status = document.querySelector('.status');
-        const startBtn = document.getElementById('startBtn');
         const loading = document.getElementById('loading');
 
         let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         let isAiSpeaking = false;
-        let isListening = false;
 
-        recognition.continuous = false;
+        recognition.continuous = true; // Continuous listening
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
@@ -151,35 +126,42 @@
                 return data.candidates[0].content.parts[0].text;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "Sorry, I couldn't process that. Please try again.";
+                return "I'm having trouble responding right now. Please try again.";
             }
         }
 
-        // Text-to-Speech with Male Voice
+        // Text-to-Speech with Realistic Male Voice
         function speakResponse(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
+            
+            // Try to find a natural-sounding male voice
             const maleVoice = voices.find(voice => 
-                voice.name.includes('Male') || 
-                voice.name.includes('Daniel') || 
-                voice.name.includes('David') || 
-                voice.gender === 'male'
-            ) || voices[0]; // Fallback to first voice if no male found
+                voice.name.toLowerCase().includes('daniel') || 
+                voice.name.toLowerCase().includes('david') || 
+                voice.name.toLowerCase().includes('matthew') || 
+                voice.name.toLowerCase().includes('male') ||
+                voice.lang === 'en-US' // Fallback to US English
+            ) || voices[0];
 
             utterance.voice = maleVoice;
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
+            utterance.rate = 0.9; // Slightly slower for natural feel
+            utterance.pitch = 1.0; // Normal pitch
             utterance.volume = 1.0;
 
             isAiSpeaking = true;
-            startBtn.disabled = true;
-            status.textContent = "AI is speaking...";
+            status.textContent = "Albert is speaking...";
+            loading.style.display = 'block';
+
+            utterance.onstart = () => {
+                recognition.stop(); // Stop listening while speaking
+            };
 
             utterance.onend = () => {
                 isAiSpeaking = false;
-                startBtn.disabled = false;
-                status.textContent = "Press Start to talk again";
-                if (!isListening) recognition.start(); // Restart listening after AI finishes
+                loading.style.display = 'none';
+                status.textContent = "Listening for you...";
+                recognition.start(); // Resume listening immediately
             };
 
             speechSynthesis.speak(utterance);
@@ -187,7 +169,9 @@
 
         // Speech Recognition Handler
         recognition.onresult = async (event) => {
-            const transcript = event.results[0][0].transcript;
+            if (isAiSpeaking) return; // Ignore input while AI speaks
+
+            const transcript = event.results[event.results.length - 1][0].transcript;
             status.textContent = `You said: ${transcript}`;
             loading.style.display = 'block';
 
@@ -199,37 +183,33 @@
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
-            status.textContent = "Error: Couldn’t hear you. Try again.";
-            isListening = false;
-            startBtn.disabled = false;
-            loading.style.display = 'none';
+            if (!isAiSpeaking) {
+                status.textContent = "Error: Couldn’t hear you. Retrying...";
+                setTimeout(() => recognition.start(), 500);
+            }
         };
 
         recognition.onend = () => {
-            isListening = false;
             if (!isAiSpeaking) {
-                startBtn.disabled = false;
-                status.textContent = "Press Start to talk again";
+                recognition.start(); // Restart immediately unless AI is speaking
             }
         };
 
-        // Start Button Handler
-        startBtn.addEventListener('click', () => {
-            if (!isAiSpeaking && !isListening) {
-                isListening = true;
-                startBtn.disabled = true;
-                status.textContent = "Listening...";
+        // Ensure voices are loaded before starting
+        function startRecognition() {
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                status.textContent = "Listening for you...";
                 recognition.start();
+            } else {
+                setTimeout(startRecognition, 100); // Wait for voices to load
             }
-        });
+        }
 
-        // Ensure voices are loaded
-        window.speechSynthesis.onvoiceschanged = () => {
-            // Voices are now available
-        };
+        window.speechSynthesis.onvoiceschanged = startRecognition;
 
-        // Initial setup
-        status.textContent = "Press Start to begin";
+        // Initial kickoff
+        startRecognition();
     </script>
 </body>
 </html>
