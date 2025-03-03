@@ -99,7 +99,7 @@
         let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         let isAiSpeaking = false;
 
-        recognition.continuous = true; // Continuous listening
+        recognition.continuous = true;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
@@ -115,38 +115,51 @@
             };
 
             try {
+                console.log('Sending request to Gemini API with:', text);
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
-                if (!response.ok) throw new Error('API request failed');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
                 const data = await response.json();
-                return data.candidates[0].content.parts[0].text;
+                const result = data.candidates[0].content.parts[0].text;
+                console.log('Gemini response:', result);
+                return result;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "I'm having trouble responding right now. Please try again.";
+                return "Sorry, Albert couldn’t process that. Please try again.";
             }
         }
 
-        // Text-to-Speech with Realistic Male Voice
+        // Text-to-Speech with Debugging
         function speakResponse(text) {
+            console.log('Attempting to speak:', text);
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
-            
-            // Try to find a natural-sounding male voice
+
+            if (voices.length === 0) {
+                console.error('No voices available yet');
+                status.textContent = "Waiting for voices to load...";
+                setTimeout(() => speakResponse(text), 500); // Retry after delay
+                return;
+            }
+
             const maleVoice = voices.find(voice => 
                 voice.name.toLowerCase().includes('daniel') || 
                 voice.name.toLowerCase().includes('david') || 
                 voice.name.toLowerCase().includes('matthew') || 
-                voice.name.toLowerCase().includes('male') ||
-                voice.lang === 'en-US' // Fallback to US English
+                voice.lang === 'en-US'
             ) || voices[0];
 
+            console.log('Selected voice:', maleVoice ? maleVoice.name : 'Default');
+
             utterance.voice = maleVoice;
-            utterance.rate = 0.9; // Slightly slower for natural feel
-            utterance.pitch = 1.0; // Normal pitch
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
             utterance.volume = 1.0;
 
             isAiSpeaking = true;
@@ -154,14 +167,24 @@
             loading.style.display = 'block';
 
             utterance.onstart = () => {
-                recognition.stop(); // Stop listening while speaking
+                console.log('Speech started');
+                recognition.stop();
             };
 
             utterance.onend = () => {
+                console.log('Speech ended');
                 isAiSpeaking = false;
                 loading.style.display = 'none';
                 status.textContent = "Listening for you...";
-                recognition.start(); // Resume listening immediately
+                recognition.start();
+            };
+
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event.error);
+                isAiSpeaking = false;
+                loading.style.display = 'none';
+                status.textContent = "Error speaking. Retrying...";
+                recognition.start();
             };
 
             speechSynthesis.speak(utterance);
@@ -169,9 +192,10 @@
 
         // Speech Recognition Handler
         recognition.onresult = async (event) => {
-            if (isAiSpeaking) return; // Ignore input while AI speaks
+            if (isAiSpeaking) return;
 
             const transcript = event.results[event.results.length - 1][0].transcript;
+            console.log('Heard:', transcript);
             status.textContent = `You said: ${transcript}`;
             loading.style.display = 'block';
 
@@ -190,26 +214,30 @@
         };
 
         recognition.onend = () => {
+            console.log('Recognition ended');
             if (!isAiSpeaking) {
-                recognition.start(); // Restart immediately unless AI is speaking
+                recognition.start();
             }
         };
 
-        // Ensure voices are loaded before starting
-        function startRecognition() {
+        // Initialization
+        function initialize() {
             const voices = speechSynthesis.getVoices();
+            console.log('Voices available:', voices.map(v => v.name));
             if (voices.length > 0) {
                 status.textContent = "Listening for you...";
                 recognition.start();
             } else {
-                setTimeout(startRecognition, 100); // Wait for voices to load
+                speechSynthesis.onvoiceschanged = () => {
+                    console.log('Voices loaded:', speechSynthesis.getVoices().map(v => v.name));
+                    status.textContent = "Listening for you...";
+                    recognition.start();
+                };
             }
         }
 
-        window.speechSynthesis.onvoiceschanged = startRecognition;
-
-        // Initial kickoff
-        startRecognition();
+        // Start the app
+        initialize();
     </script>
 </body>
 </html>
