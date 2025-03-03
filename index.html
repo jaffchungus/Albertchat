@@ -115,44 +115,46 @@
             };
 
             try {
-                console.log('Fetching from Gemini:', text);
+                console.log('Sending to Gemini:', text);
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
-                if (!response.ok) throw new Error('API request failed');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
                 const data = await response.json();
                 const result = data.candidates[0].content.parts[0].text;
-                console.log('Gemini response:', result);
+                console.log('Gemini response received:', result);
                 return result;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "I didn’t catch that. Could you say it again?";
+                return "Hmm, I didn’t get that. Could you repeat it?";
             }
         }
 
         // Text-to-Speech with Natural Voice
         function speakResponse(text) {
-            console.log('Speaking:', text);
+            console.log('Preparing to speak:', text);
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
 
-            // Select a natural-sounding male voice
+            // Select the most natural male voice
             const naturalVoice = voices.find(voice => 
-                voice.name.toLowerCase().includes('google') || // Prefer Google voices for realism
+                voice.name.toLowerCase().includes('google') || // Google voices are more natural
                 voice.name.toLowerCase().includes('daniel') || 
                 voice.name.toLowerCase().includes('david') || 
                 voice.name.toLowerCase().includes('matthew') || 
                 voice.lang === 'en-US'
-            ) || voices[0]; // Fallback to first available voice
+            ) || voices[0];
 
-            console.log('Voice selected:', naturalVoice ? naturalVoice.name : 'Default');
+            console.log('Using voice:', naturalVoice ? naturalVoice.name : 'Default');
 
             utterance.voice = naturalVoice;
-            utterance.rate = 0.95; // Slightly slower for natural cadence
-            utterance.pitch = 1.0; // Normal pitch
+            utterance.rate = 0.95; // Slightly slower for natural feel
+            utterance.pitch = 1.0;
             utterance.volume = 1.0;
 
             isAiSpeaking = true;
@@ -160,12 +162,12 @@
             loading.style.display = 'block';
 
             utterance.onstart = () => {
-                console.log('Speech started');
+                console.log('Albert started speaking');
                 recognition.stop();
             };
 
             utterance.onend = () => {
-                console.log('Speech ended');
+                console.log('Albert finished speaking');
                 isAiSpeaking = false;
                 loading.style.display = 'none';
                 status.textContent = "Listening for you...";
@@ -173,18 +175,18 @@
             };
 
             utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event.error);
+                console.error('Speech error:', event.error);
                 isAiSpeaking = false;
                 loading.style.display = 'none';
                 status.textContent = "Listening for you...";
-                recognition.start(); // Silently retry
+                recognition.start();
             };
 
-            if (voices.length > 0) {
-                speechSynthesis.speak(utterance);
+            if (voices.length === 0) {
+                console.log('Voices not loaded, retrying...');
+                setTimeout(() => speakResponse(text), 500);
             } else {
-                console.log('Voices not loaded yet, waiting...');
-                setTimeout(() => speakResponse(text), 500); // Retry if voices aren’t ready
+                speechSynthesis.speak(utterance);
             }
         }
 
@@ -193,11 +195,12 @@
             if (isAiSpeaking) return;
 
             const transcript = event.results[event.results.length - 1][0].transcript;
-            console.log('Heard:', transcript);
+            console.log('Heard you say:', transcript);
             status.textContent = `You said: ${transcript}`;
             loading.style.display = 'block';
 
             const response = await getGeminiResponse(transcript);
+            console.log('Response to speak:', response);
             loading.style.display = 'none';
 
             speakResponse(response);
@@ -212,7 +215,7 @@
         };
 
         recognition.onend = () => {
-            console.log('Recognition ended');
+            console.log('Recognition stopped');
             if (!isAiSpeaking) {
                 recognition.start();
             }
@@ -221,15 +224,18 @@
         // Initialization
         function initialize() {
             const voices = speechSynthesis.getVoices();
-            console.log('Available voices:', voices.map(v => v.name));
+            console.log('Initial voices:', voices.map(v => v.name));
             if (voices.length > 0) {
                 status.textContent = "Listening for you...";
                 recognition.start();
+                // Test speech to ensure it works
+                speakResponse("Hello, I’m Albert. How can I assist you?");
             } else {
                 speechSynthesis.onvoiceschanged = () => {
                     console.log('Voices loaded:', speechSynthesis.getVoices().map(v => v.name));
                     status.textContent = "Listening for you...";
                     recognition.start();
+                    speakResponse("Hello, I’m Albert. How can I assist you?");
                 };
             }
         }
