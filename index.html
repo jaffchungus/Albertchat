@@ -92,7 +92,7 @@
     </div>
 
     <script>
-        const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE";
+        const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE"; // Your confirmed working key
         const status = document.querySelector('.status');
         const loading = document.getElementById('loading');
 
@@ -103,7 +103,7 @@
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
-        // Gemini API Call
+        // Gemini API Call with Better Error Handling
         async function getGeminiResponse(text) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
             const body = {
@@ -126,16 +126,19 @@
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
                 const data = await response.json();
+                if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+                    throw new Error('Invalid response structure');
+                }
                 const result = data.candidates[0].content.parts[0].text;
                 console.log('Gemini response:', result);
                 return result;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "Sorry, I couldn’t catch that. Could you try again?";
+                return "Hey, something went off the rails there. Wanna give it another go?";
             }
         }
 
-        // Text-to-Speech with Natural Voice Settings
+        // Text-to-Speech with Super Natural Voice
         function speakResponse(text) {
             console.log('Attempting to speak:', text);
             const utterance = new SpeechSynthesisUtterance(text);
@@ -143,32 +146,32 @@
 
             if (voices.length === 0) {
                 console.error('No voices available yet');
-                status.textContent = "Hold on, loading voices...";
+                status.textContent = "Hang on, loading voices...";
                 setTimeout(() => speakResponse(text), 500); // Retry after delay
                 return;
             }
 
-            // Select a natural-sounding voice (favoring Google or high-quality en-US voices)
+            // Pick a premium natural voice (e.g., Google or high-quality en-US)
             const naturalVoice = voices.find(voice => 
                 voice.name.toLowerCase().includes('google') || 
                 voice.name.toLowerCase().includes('natural') || 
-                (voice.lang === 'en-US' && voice.name.toLowerCase().includes('male')) ||
-                voice.name.toLowerCase().includes('matthew')
+                voice.name.toLowerCase().includes('matthew') || 
+                (voice.lang === 'en-US' && !voice.name.toLowerCase().includes('robot'))
             ) || voices.find(voice => voice.lang === 'en-US') || voices[0];
 
             console.log('Selected voice:', naturalVoice ? naturalVoice.name : 'Default');
 
             utterance.voice = naturalVoice;
-            utterance.rate = 1.0;  // Normal speaking speed for natural flow
-            utterance.pitch = 1.0; // Neutral pitch, tweak slightly for character if desired
+            utterance.rate = 1.05;  // Slightly faster than normal for a lively tone
+            utterance.pitch = 0.95; // Slightly lower pitch for warmth
             utterance.volume = 1.0;
 
-            // Add slight pauses for natural phrasing
-            const naturalText = text.replace(/([.!?])\s/g, '$1|'); // Insert pause marker after punctuation
-            utterance.text = naturalText.split('|').join(' '); // Replace with space for subtle breaks
+            // Add natural pauses after punctuation
+            const naturalText = text.replace(/([.!?])\s/g, '$1|').split('|').join(' ');
+            utterance.text = naturalText;
 
             isAiSpeaking = true;
-            status.textContent = "Hey, I’m talking now...";
+            status.textContent = "Alright, here’s my take...";
             loading.style.display = 'block';
 
             utterance.onstart = () => {
@@ -180,7 +183,7 @@
                 console.log('Speech ended');
                 isAiSpeaking = false;
                 loading.style.display = 'none';
-                status.textContent = "Go ahead, I’m listening...";
+                status.textContent = "Your turn, what’s up?";
                 recognition.start();
             };
 
@@ -188,7 +191,7 @@
                 console.error('Speech synthesis error:', event.error);
                 isAiSpeaking = false;
                 loading.style.display = 'none';
-                status.textContent = "Oops, something went wrong. Let’s try that again...";
+                status.textContent = "Oops, my voice broke. Let’s try that again...";
                 recognition.start();
             };
 
@@ -213,7 +216,7 @@
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
             if (!isAiSpeaking) {
-                status.textContent = "Whoops, didn’t catch that. Give it another shot...";
+                status.textContent = "Didn’t catch that, sorry! Try again?";
                 setTimeout(() => recognition.start(), 500);
             }
         };
@@ -230,12 +233,12 @@
             const voices = speechSynthesis.getVoices();
             console.log('Voices available:', voices.map(v => v.name));
             if (voices.length > 0) {
-                status.textContent = "Go ahead, I’m listening...";
+                status.textContent = "Your turn, what’s up?";
                 recognition.start();
             } else {
                 speechSynthesis.onvoiceschanged = () => {
                     console.log('Voices loaded:', speechSynthesis.getVoices().map(v => v.name));
-                    status.textContent = "Go ahead, I’m listening...";
+                    status.textContent = "Your turn, what’s up?";
                     recognition.start();
                 };
             }
