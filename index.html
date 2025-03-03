@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Albert Chat</title>
+    <title>Gemini Voice Chat</title>
     <style>
         * {
             margin: 0;
@@ -29,12 +29,10 @@
             box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
             position: relative;
-            width: 90%;
-            max-width: 600px;
         }
 
         h1 {
-            font-size: 42px;
+            font-size: 36px;
             margin-bottom: 20px;
             text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
         }
@@ -42,10 +40,33 @@
         .status {
             font-size: 20px;
             margin: 20px 0;
-            padding: 15px;
+            padding: 10px;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.1);
-            min-height: 60px;
+        }
+
+        .start-btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            background: linear-gradient(45deg, #00ffcc, #ff0066);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
+        }
+
+        .start-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .loading {
@@ -67,6 +88,7 @@
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
+        /* Additional styling for effect */
         .container::before {
             content: '';
             position: absolute;
@@ -86,24 +108,27 @@
 </head>
 <body>
     <div class="container">
-        <h1>Albert Chat</h1>
-        <div class="status">Say something to start chatting with Albert...</div>
+        <h1>Gemini Voice Chat</h1>
+        <div class="status">Press Start to begin</div>
+        <button class="start-btn" id="startBtn">Start Talking</button>
         <div class="loading" id="loading"></div>
     </div>
 
     <script>
-        const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE"; // Your confirmed working key
+        const API_KEY = "AIzaSyD4m0VHzg-DpEYhsvoEhMRKLBBiW2NcVrE";
         const status = document.querySelector('.status');
+        const startBtn = document.getElementById('startBtn');
         const loading = document.getElementById('loading');
 
         let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         let isAiSpeaking = false;
+        let isListening = false;
 
-        recognition.continuous = true;
+        recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
-        // Gemini API Call with Better Error Handling
+        // Gemini API Call
         async function getGeminiResponse(text) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
             const body = {
@@ -115,84 +140,46 @@
             };
 
             try {
-                console.log('Sending request to Gemini API with:', text);
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error('API request failed');
                 const data = await response.json();
-                if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-                    throw new Error('Invalid response structure');
-                }
-                const result = data.candidates[0].content.parts[0].text;
-                console.log('Gemini response:', result);
-                return result;
+                return data.candidates[0].content.parts[0].text;
             } catch (error) {
                 console.error('Gemini API Error:', error);
-                return "Hey, something went off the rails there. Wanna give it another go?";
+                return "Sorry, I couldn't process that. Please try again.";
             }
         }
 
-        // Text-to-Speech with Super Natural Voice
+        // Text-to-Speech with Male Voice
         function speakResponse(text) {
-            console.log('Attempting to speak:', text);
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
+            const maleVoice = voices.find(voice => 
+                voice.name.includes('Male') || 
+                voice.name.includes('Daniel') || 
+                voice.name.includes('David') || 
+                voice.gender === 'male'
+            ) || voices[0]; // Fallback to first voice if no male found
 
-            if (voices.length === 0) {
-                console.error('No voices available yet');
-                status.textContent = "Hang on, loading voices...";
-                setTimeout(() => speakResponse(text), 500); // Retry after delay
-                return;
-            }
-
-            // Pick a premium natural voice (e.g., Google or high-quality en-US)
-            const naturalVoice = voices.find(voice => 
-                voice.name.toLowerCase().includes('google') || 
-                voice.name.toLowerCase().includes('natural') || 
-                voice.name.toLowerCase().includes('matthew') || 
-                (voice.lang === 'en-US' && !voice.name.toLowerCase().includes('robot'))
-            ) || voices.find(voice => voice.lang === 'en-US') || voices[0];
-
-            console.log('Selected voice:', naturalVoice ? naturalVoice.name : 'Default');
-
-            utterance.voice = naturalVoice;
-            utterance.rate = 1.05;  // Slightly faster than normal for a lively tone
-            utterance.pitch = 0.95; // Slightly lower pitch for warmth
+            utterance.voice = maleVoice;
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
             utterance.volume = 1.0;
 
-            // Add natural pauses after punctuation
-            const naturalText = text.replace(/([.!?])\s/g, '$1|').split('|').join(' ');
-            utterance.text = naturalText;
-
             isAiSpeaking = true;
-            status.textContent = "Alright, here’s my take...";
-            loading.style.display = 'block';
-
-            utterance.onstart = () => {
-                console.log('Speech started');
-                recognition.stop();
-            };
+            startBtn.disabled = true;
+            status.textContent = "AI is speaking...";
 
             utterance.onend = () => {
-                console.log('Speech ended');
                 isAiSpeaking = false;
-                loading.style.display = 'none';
-                status.textContent = "Your turn, what’s up?";
-                recognition.start();
-            };
-
-            utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event.error);
-                isAiSpeaking = false;
-                loading.style.display = 'none';
-                status.textContent = "Oops, my voice broke. Let’s try that again...";
-                recognition.start();
+                startBtn.disabled = false;
+                status.textContent = "Press Start to talk again";
+                if (!isListening) recognition.start(); // Restart listening after AI finishes
             };
 
             speechSynthesis.speak(utterance);
@@ -200,10 +187,7 @@
 
         // Speech Recognition Handler
         recognition.onresult = async (event) => {
-            if (isAiSpeaking) return;
-
-            const transcript = event.results[event.results.length - 1][0].transcript;
-            console.log('Heard:', transcript);
+            const transcript = event.results[0][0].transcript;
             status.textContent = `You said: ${transcript}`;
             loading.style.display = 'block';
 
@@ -215,37 +199,37 @@
 
         recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
-            if (!isAiSpeaking) {
-                status.textContent = "Didn’t catch that, sorry! Try again?";
-                setTimeout(() => recognition.start(), 500);
-            }
+            status.textContent = "Error: Couldn’t hear you. Try again.";
+            isListening = false;
+            startBtn.disabled = false;
+            loading.style.display = 'none';
         };
 
         recognition.onend = () => {
-            console.log('Recognition ended');
+            isListening = false;
             if (!isAiSpeaking) {
-                recognition.start();
+                startBtn.disabled = false;
+                status.textContent = "Press Start to talk again";
             }
         };
 
-        // Initialization
-        function initialize() {
-            const voices = speechSynthesis.getVoices();
-            console.log('Voices available:', voices.map(v => v.name));
-            if (voices.length > 0) {
-                status.textContent = "Your turn, what’s up?";
+        // Start Button Handler
+        startBtn.addEventListener('click', () => {
+            if (!isAiSpeaking && !isListening) {
+                isListening = true;
+                startBtn.disabled = true;
+                status.textContent = "Listening...";
                 recognition.start();
-            } else {
-                speechSynthesis.onvoiceschanged = () => {
-                    console.log('Voices loaded:', speechSynthesis.getVoices().map(v => v.name));
-                    status.textContent = "Your turn, what’s up?";
-                    recognition.start();
-                };
             }
-        }
+        });
 
-        // Start the app
-        initialize();
+        // Ensure voices are loaded
+        window.speechSynthesis.onvoiceschanged = () => {
+            // Voices are now available
+        };
+
+        // Initial setup
+        status.textContent = "Press Start to begin";
     </script>
 </body>
 </html>
