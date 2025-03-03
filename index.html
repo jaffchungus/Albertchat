@@ -155,21 +155,21 @@
             }
         }
 
-        // Text-to-Speech with Male Voice
+        // Text-to-Speech with Natural Voice
         function speakResponse(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             const voices = speechSynthesis.getVoices();
-            const maleVoice = voices.find(voice => 
-                voice.name.includes('Male') || 
+            const naturalVoice = voices.find(voice => 
+                voice.name.includes('Natural') || 
                 voice.name.includes('Daniel') || 
                 voice.name.includes('David') || 
                 voice.gender === 'male'
-            ) || voices[0]; // Fallback to first voice if no male found
+            ) || voices[0]; // Fallback to first voice if no natural voice found
 
-            utterance.voice = maleVoice;
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
+            utterance.voice = naturalVoice;
+            utterance.rate = 0.9; // Slightly slower for more natural sound
+            utterance.pitch = 1.0; // Default pitch
+            utterance.volume = 1.0; // Default volume
 
             isAiSpeaking = true;
             startBtn.disabled = true;
